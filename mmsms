@@ -74,10 +74,10 @@ function send() {
 }
 
 function usage() {
-        echo "###########################################"
-        echo "#####   ModemManager SMS Client v1.0  #####"
-        echo "#####       Created by Satria K.      #####"
-        echo "###########################################"
+    echo "###########################################"
+    echo "#####   ModemManager SMS Client v1.0  #####"
+    echo "#####       Created by Satria K.      #####"
+    echo "###########################################"
     echo "Usage:
   -r   Read all SMS
   -s   Send SMS. Use format: -s [phonenumber] [message]
