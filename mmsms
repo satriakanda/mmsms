@@ -1,0 +1,103 @@
+#!/bin/bash
+# Created by Satria K.
+# Forked from https://github.com/frizkyiman/
+
+modem_info=$(mmcli -L | awk -F']' '/Modem/{print $2}' | sed 's/^[ \t]*//')
+modem_id=$(mmcli -L | awk -F'/Modem/' 'NF>1{print $2; exit}' | awk '{print $1}')
+sms_list=$(mmcli -m "$modem_id" --messaging-list-sms)
+
+function read() {
+    log_file="/root/sms_message.log"
+    max_file_size=524288 #0.5MB
+    [ ! -d "$log_file" ] && touch "$log_file"
+
+    if [ "$(mmcli -L)" == "No modems were found" ]; then
+        echo "Error: Modem not found."
+        exit 1
+    elif [ "$sms_list" = "No sms messages were found" ]; then
+        echo "No SMS messages were found from modem [$modem_info]"
+        exit 0
+    else
+        echo "SMS received from modem [$modem_info]"
+        echo "SMS Message list:"
+        echo "$sms_list"
+        IFS=$'\n'
+        rows=($sms_list)
+        for sms_info in "${rows[@]}"; do
+            sms_id=$(echo "$sms_info" | awk -F'/SMS/' 'NF>1{print $2}' | awk '{print $1}')
+            message=$(mmcli -m "$modem_id" --sms "$sms_id")
+            if [ -n "$message" ]; then
+                echo "$message" | tee temp_message.log
+                cat "$log_file" >> temp_message.log && mv temp_message.log "$log_file"
+            fi
+        done
+        exit 0
+    fi
+}
+
+function delete() {
+    ## Cek jenis modem
+    if [ -n "${1}" ]; then
+        echo -n "Delete SMS ID: ${1} => "
+        mmcli -m $modem_id --messaging-delete-sms=/org/freedesktop/ModemManager1/SMS/$1
+    else
+        echo "Delete all SMS from modem [$modem_info]"
+        IFS=$'\n'
+        rows=($sms_list)
+        for sms_info in "${rows[@]}"; do
+            sms_id=$(echo "$sms_info" | awk -F'/SMS/' 'NF>1{print $2}' | awk '{print $1}')
+            if [ -n "$sms_id" ]; then
+                echo -n "Delete SMS ID: $sms_id => "
+                mmcli -m $modem_id --messaging-delete-sms=/org/freedesktop/ModemManager1/SMS/$sms_id
+            else
+                echo "No SMS found!"
+            fi
+        done
+    fi
+    exit 0
+}
+
+function send() {
+    to="${1}"
+    if [[ ! "$to" =~ ^\+?[0-9]+$ ]]; then
+        echo "Please provide the receiver number (08xxxx or +628xxx)"
+        exit 1
+    fi
+    message="${@:2}"
+    if [ -z "$message" ]; then
+        echo "Please provide the message"
+        exit 1
+    fi
+    sms_info=$(mmcli -m "$modem_id"  --messaging-create-sms="number='${to}',text='${message}',delivery-report-request='yes'")
+    sms_id=$(echo "$sms_info" | awk -F'/SMS/' 'NF>1{print $2}' | awk '{print $1}')
+    mmcli -s $sms_id --send
+}
+
+function usage() {
+        echo "###########################################"
+        echo "#####   ModemManager SMS Client v1.0  #####"
+        echo "#####       Created by Satria K.      #####"
+        echo "###########################################"
+    echo "Usage:
+  -r   Read all SMS
+  -s   Send SMS. Use format: -s [phonenumber] [message]
+  -d   Delete all SMS. Use -d [number] to delete a spesific SMS with ID number"
+}
+
+case "${1}" in
+    -r)
+        read
+        ;;
+    -d)
+        shift
+        delete "${1}"
+        ;;
+    -s)
+        shift
+        send "${@}"
+      ;;
+    *)
+      usage
+      ;;
+esac
+
