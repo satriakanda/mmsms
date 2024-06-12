@@ -68,7 +68,7 @@ function send() {
         echo "Please provide the message"
         exit 1
     fi
-    sms_info=$(mmcli -m "$modem_id"  --messaging-create-sms="number='${to}',text='${message}',delivery-report-request='yes'")
+    sms_info=$(mmcli -m "$modem_id"  --messaging-create-sms="number='${to}',text='${message}'")
     sms_id=$(echo "$sms_info" | awk -F'/SMS/' 'NF>1{print $2}' | awk '{print $1}')
     mmcli -s $sms_id --send
 }
